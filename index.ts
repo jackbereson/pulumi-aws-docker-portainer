@@ -2,29 +2,31 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as docker from "@pulumi/docker";
 
-const config = new pulumi.Config();
+// const config = new pulumi.Config();
 const stackName = pulumi.getStack();
 
 // Lấy tên key pair từ cấu hình hoặc sử dụng giá trị mặc định
-const keyPairName = config.get("keyPairName") || "my-key-pair";
+// const keyPairName = config.get("keyPairName") || "my-key-pair";
 
 
 // Default VPC
 const defaultVpc = new aws.ec2.DefaultVpc("defaultVpc");
 
 // Export VPC ID as an output
-export const vpcId = defaultVpc.id.get();
+export const vpcId = defaultVpc.id;
 
 // Tạo một EC2 instance
 const instance = new aws.ec2.Instance("my-instance", {
     ami: "ami-0c94855ba95c71c99", // AMI ID của Amazon Linux 2
     instanceType: "t2.micro",
-    keyName: keyPairName,
+    // keyName: keyPairName,
     userData: `#!/bin/bash
                 sudo yum update -y
                 sudo amazon-linux-extras install docker -y
-                sudo service docker start
-                sudo usermod -a -G docker ec2-user`,
+                sudo service docker stop
+                sudo usermod -a -G docker ec2-user
+                sudo service docker start`,
+    associatePublicIpAddress: true,
 });
 
 // Tạo một Security Group cho instance
@@ -57,7 +59,7 @@ new aws.ec2.SecurityGroupRule("portainer-access", {
 
 // Kết nối instance với Security Group
 const networkInterface = new aws.ec2.NetworkInterface("my-network-interface", {
-    subnetId: aws.ec2.getSubnetIds({ vpcId }).then(subnet => subnet.ids[0]), // Lấy subnet ID đầu tiên
+    subnetId: vpcId.apply(vpcId => aws.ec2.getSubnetIds({ vpcId }).then(subnet => subnet.ids[0])), // Lấy subnet ID đầu tiên
     securityGroups: [securityGroup.id],
 });
 
